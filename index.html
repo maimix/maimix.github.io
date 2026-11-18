@@ -323,6 +323,8 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   .card{max-width:500px}
 }
 </style>
+<!-- 引入 Supabase JS 客户端库 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -467,6 +469,33 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
     <button class="btn-sub" data-action="closeModal" data-target="leaderboard-modal">返回主菜单</button>
   </div>
 </div>
+
+<!-- 5. 成就系统弹窗 -->
+<div class="overlay hidden" id="achievement-modal">
+  <div class="card">
+    <span class="badge">ACHIEVEMENTS SYSTEM</span>
+    <h2 class="title">刀客勋章殿堂</h2>
+    <p class="subtitle">达成指定斩切条件，解锁无上荣誉与称号。</p>
+    <div class="list-container" id="achievement-list"></div>
+    <button class="btn-sub" data-action="closeModal" data-target="achievement-modal">返回主菜单</button>
+  </div>
+</div>
+
+<!-- 6. 个人数据面板弹窗 -->
+<div class="overlay hidden" id="profile-modal">
+  <div class="card">
+    <span class="badge">PLAYER PROFILE STATS</span>
+    <h2 class="title" id="prof-name">侠客档案</h2>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-num" id="pf-total-score">0</div><div class="stat-lbl">生涯总得分</div></div>
+      <div class="stat-box"><div class="stat-num" id="pf-total-juice">0 ml</div><div class="stat-lbl">生涯总鲜榨汁</div></div>
+      <div class="stat-box"><div class="stat-num" id="pf-total-sliced">0 个</div><div class="stat-lbl">累计斩切柚子</div></div>
+      <div class="stat-box"><div class="stat-num" id="pf-max-combo">0 连斩</div><div class="stat-lbl">最高单局连斩</div></div>
+    </div>
+    <button class="btn-sub" data-action="closeModal" data-target="profile-modal">返回主菜单</button>
+  </div>
+</div>
+
 <!-- 游戏结算战报面板 -->
 <div class="overlay hidden" id="end-modal">
   <div class="card">
@@ -489,11 +518,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 <!-- 自定义轻量提示条 (替代原生 alert) -->
 <div id="toast-bar" style="position:fixed;top:calc(18px + var(--safe-top));left:50%;transform:translateX(-50%) translateY(-16px);background:rgba(15,23,42,.95);border:1px solid rgba(251,191,36,.45);color:#fde047;padding:9px 18px;border-radius:99px;font-size:13px;font-weight:700;z-index:60;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;box-shadow:0 10px 28px rgba(0,0,0,.5);white-space:nowrap;"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+<script>
 (function(){
 "use strict";
 
@@ -540,13 +565,11 @@ function enableSmoothBoundaryScroll(el) {
   }, { passive: true });
 }
 
-// ================= 云端跨设备实时排行榜与用户档案同步 =================
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'pomelo-slicer-global';
-let db = null;
-let auth = null;
-let cloudUser = null;
+// ================= Supabase 云端跨设备实时排行榜与同步 =================
+const SUPABASE_URL = "https://spxdzedpietfhqaeapoo.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_H2abT1WIn4U9T_2bfbz0tQ_D772jK6B";
+let supabaseClient = null;
 let cloudLeaderboardCache = [];
-let unsubscribeLeaderboard = null;
 
 function setSyncStatus(state, text) {
   const badge = document.getElementById('cloud-sync-badge');
@@ -571,28 +594,16 @@ function setSyncStatus(state, text) {
 
 async function initCloudSync() {
   try {
-    if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-      setSyncStatus('offline', '🟡 离线本地模式 · 联网后自动同步');
-      return;
+    if (typeof window.supabase === 'undefined') {
+      throw new Error('Supabase SDK not loaded');
     }
-    const firebaseConfig = JSON.parse(__firebase_config);
-    const app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-
-    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-      const cred = await signInWithCustomToken(auth, __initial_auth_token);
-      cloudUser = cred.user;
-    } else {
-      const cred = await signInAnonymously(auth);
-      cloudUser = cred.user;
-    }
-
-    if (!cloudUser) return;
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     setSyncStatus('online', '🟢 云端实时同步中 · 跨设备共享');
-    startLeaderboardListener();
+    await fetchGlobalLeaderboard();
+    
+    // 定期刷新排行榜 (每 10 秒)
+    setInterval(fetchGlobalLeaderboard, 10000);
 
-    // 若本地已有登录侠客，初始化时自动同步一次最新档案到云端
     if (currentUser) {
       const uData = getUserData(currentUser);
       await syncUserToCloud(currentUser, uData);
@@ -603,86 +614,55 @@ async function initCloudSync() {
   }
 }
 
-function getSafePlayerDocId(username) {
-  const cleanName = encodeURIComponent(username.trim()).replace(/%/g, '_');
-  const uidSuffix = cloudUser ? cloudUser.uid.slice(0, 8) : 'guest';
-  return `${cleanName}_${uidSuffix}`;
-}
-
-async function syncUserToCloud(username, uData) {
-  if (!db || !cloudUser || !username) return;
+async function fetchGlobalLeaderboard() {
+  if (!supabaseClient) return;
   try {
-    const docId = getSafePlayerDocId(username);
-    // 1. 写入公开全局排行榜集合: /artifacts/{appId}/public/data/pomelo_global_leaderboard
-    const lbRef = doc(db, 'artifacts', appId, 'public', 'data', 'pomelo_global_leaderboard', docId);
-    const existingSnap = await getDoc(lbRef);
-    const prevBest = existingSnap.exists() ? (existingSnap.data().bestArcade || 0) : 0;
-    const mergedBest = Math.max(prevBest, uData.bestArcade || 0);
+    const { data, error } = await supabaseClient
+      .from('leaderboard')
+      .select('name, score')
+      .order('score', { ascending: false })
+      .limit(20);
 
-    await setDoc(lbRef, {
-      name: username,
-      uid: cloudUser.uid,
-      bestArcade: mergedBest,
-      totalScore: uData.totalScore || 0,
-      totalJuice: uData.totalJuice || 0,
-      totalSliced: uData.totalSliced || 0,
-      maxCombo: uData.maxCombo || 0,
-      updatedAt: Date.now()
-    }, { merge: true });
-
-    // 2. 同步写入私有用户档案集合: /artifacts/{appId}/users/{userId}/pomelo_profile
-    const privateRef = doc(db, 'artifacts', appId, 'users', cloudUser.uid, 'pomelo_profile', 'stats');
-    await setDoc(privateRef, {
-      username,
-      ...uData,
-      bestArcade: mergedBest,
-      updatedAt: Date.now()
-    }, { merge: true });
-  } catch (err) {
-    console.warn('Sync to cloud failed:', err);
-  }
-}
-
-function startLeaderboardListener() {
-  if (!db || !cloudUser) return;
-  if (unsubscribeLeaderboard) unsubscribeLeaderboard();
-
-  // 严格遵守规则：简单 collection 查询，在前端内存中进行排序与截取前 20 名
-  const lbCol = collection(db, 'artifacts', appId, 'public', 'data', 'pomelo_global_leaderboard');
-  unsubscribeLeaderboard = onSnapshot(
-    lbCol,
-    (snapshot) => {
-      const records = [];
-      snapshot.forEach(docSnap => {
-        const d = docSnap.data();
-        if (d && d.name) {
-          records.push({
-            id: docSnap.id,
-            name: d.name,
-            uid: d.uid || '',
-            score: Number(d.bestArcade || 0),
-            juice: Number(d.totalJuice || 0),
-            updatedAt: Number(d.updatedAt || 0)
-          });
-        }
-      });
-
-      // 按最高分降序排列，同分按更新时间先后排序，取前 20 名
-      records.sort((a, b) => (b.score - a.score) || (a.updatedAt - b.updatedAt));
-      cloudLeaderboardCache = records.slice(0, 20);
-      setSyncStatus('online', `🟢 云端实时同步中 · 已收录 ${records.length} 位侠客`);
-
-      // 如果排行榜弹窗当前正在打开，实时刷新界面
+    if (error) throw error;
+    if (data) {
+      cloudLeaderboardCache = data.map(item => ({ name: item.name, score: item.score }));
+      setSyncStatus('online', `🟢 云端实时同步中 · 已收录 ${cloudLeaderboardCache.length} 位侠客`);
       const lbModal = document.getElementById('leaderboard-modal');
       if (lbModal && !lbModal.classList.contains('hidden')) {
         renderLeaderboard();
       }
-    },
-    (error) => {
-      console.warn('Leaderboard snapshot error:', error);
-      setSyncStatus('offline', '🟡 云端监听中断 · 显示本地兜底数据');
     }
-  );
+  } catch (err) {
+    console.warn('Fetch leaderboard failed:', err);
+  }
+}
+
+async function syncUserToCloud(username, uData) {
+  if (!supabaseClient || !username) return;
+  try {
+    const score = uData.bestArcade || 0;
+    const { data: existing } = await supabaseClient
+      .from('leaderboard')
+      .select('score')
+      .eq('name', username)
+      .maybeSingle();
+
+    if (existing) {
+      if (score > existing.score) {
+        await supabaseClient
+          .from('leaderboard')
+          .update({ score: score, updated_at: new Date() })
+          .eq('name', username);
+      }
+    } else {
+      await supabaseClient
+        .from('leaderboard')
+        .insert([{ name: username, score: score }]);
+    }
+    fetchGlobalLeaderboard();
+  } catch (err) {
+    console.warn('Sync user to cloud failed:', err);
+  }
 }
 
 const cvs = document.getElementById('c'), ctx = cvs.getContext('2d');
@@ -927,40 +907,6 @@ function setBladeSkin(skin, btn) {
   }
   updateDecorSummary();
 }
-
-window.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.card, .list-container').forEach(el => {
-    enableSmoothBoundaryScroll(el);
-  });
-
-  if (currentUser) {
-    document.getElementById('login-modal').classList.add('hidden');
-    document.getElementById('start-modal').classList.remove('hidden');
-    document.getElementById('current-user-display').textContent = `👤 侠客: ${currentUser}`;
-  }
-
-  const bindClick = (selector, handler) => {
-    document.querySelectorAll(selector).forEach(el => {
-      el.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        handler(el);
-      });
-    });
-  };
-
-  bindClick('[data-action="login"]', () => handleLogin());
-  bindClick('[data-action="openLogin"]', () => openLoginModal());
-  bindClick('[data-action="showMenu"]', () => showMenu());
-  bindClick('[data-action="openModal"]', el => openModal(el.dataset.target));
-  bindClick('[data-action="closeModal"]', el => closeModal(el.dataset.target));
-  bindClick('[data-skin]', el => setBgSkin(el.dataset.skin, el));
-  bindClick('[data-blade]', el => setBladeSkin(el.dataset.blade, el));
-  bindClick('.m-card', el => {
-    const mode = el.dataset.mode;
-    if (mode) startGame(mode);
-  });
-});
 
 const BLADE_CONFIGS = {
   flame:     { outer: 'rgba(251,146,60,0.7)', core: '#fff5f5', spark: '#f97316' },
@@ -1581,7 +1527,7 @@ function loop(now) {
     ctx.fillStyle = state.flashColor; ctx.globalAlpha = state.flash;
     ctx.fillRect(0, 0, W, H);
     state.flash = Math.max(0, state.flash - rawDt * 1.6);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = '1';
   }
 
   ctx.restore();
