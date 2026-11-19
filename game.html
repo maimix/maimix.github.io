@@ -62,24 +62,27 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 .score-label{font-size:clamp(9px,2.4vw,12px);letter-spacing:1.5px;color:#fbbf24;text-transform:uppercase;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .score-val{font-size:var(--score-fs);font-weight:800;line-height:1.1;background:linear-gradient(135deg,#fffbeb,#fcd34d,#fb923c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-variant-numeric:tabular-nums}
 .best-val{font-size:clamp(9px,2.4vw,12px);color:#94a3b8;margin-top:2px;white-space:nowrap}
-.right-hud{display:flex;align-items:center;gap:clamp(6px,1.6vw,10px);flex-shrink:0}
+.right-hud{display:flex;align-items:flex-start;gap:clamp(6px,1.6vw,10px);flex-shrink:0}
 .status-pill{
   background:rgba(15,23,42,.68);
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
   border:1px solid rgba(255,255,255,.15);
   border-radius:var(--radius);
-  padding:clamp(8px,2.4vw,11px) clamp(10px,3vw,16px);
+  padding:clamp(7px,2vw,10px) clamp(10px,2.8vw,14px);
   display:flex;
-  align-items:center;
-  gap:6px;
-  font-size:clamp(13px,3.6vw,17px);
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  gap:4px;
+  font-size:clamp(13px,3.5vw,16px);
   font-weight:700;
   box-shadow:0 8px 24px rgba(0,0,0,.3);
   white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
-.heart{transition:transform .25s,opacity .25s;filter:drop-shadow(0 0 6px rgba(244,63,94,.5))}
+.status-row{display:flex;align-items:center;gap:4px;line-height:1.15}
+.heart{font-size:clamp(12px,3.2vw,15px);transition:transform .25s,opacity .25s;filter:drop-shadow(0 0 6px rgba(244,63,94,.5))}
 .heart.lost{opacity:.25;transform:scale(.75);filter:grayscale(1)}
 .icon-btn{
   pointer-events:auto;
@@ -198,7 +201,10 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   color:#cbd5e1;
 }
 
-.mode-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+@media (max-width:440px){
+  .mode-grid{grid-template-columns:1fr}
+}
 .m-card{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.1);
@@ -265,7 +271,8 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
     </div>
     <div class="right-hud">
       <div class="status-pill" id="status-pill">
-        <span style="color:#38bdf8">⏱ 60s</span>
+        <div class="status-row"><span style="color:#38bdf8">⏱ 60s</span></div>
+        <div class="status-row"><span class="heart">❤️</span><span class="heart">❤️</span><span class="heart">❤️</span></div>
       </div>
       <button class="icon-btn" id="snd-btn" title="音效开关">🔊</button>
       <button class="icon-btn" id="home-btn" title="暂停/选关">⏸</button>
@@ -294,7 +301,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
       <span class="p-tag">🔴 红柚/🟠 橙柚/🟢 绿柚</span>
       <span class="p-tag" style="border-color:rgba(248,250,252,.4);color:#f8fafc">⚪ 白柚 +5s</span>
       <span class="p-tag" style="border-color:rgba(56,189,248,.4);color:#7dd3fc">🔵 蓝柚 冰霜减速</span>
-      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 黄金巨柚王 连斩狂热</span>
+      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 黄金巨柚王 5连斩狂热</span>
     </div>
 
     <div class="mode-grid">
@@ -303,7 +310,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
           <span class="m-icon">🎯</span>
           <span class="m-name">经典街机</span>
         </div>
-        <div class="m-desc">限时60秒，右上角倒计时，含炸弹与黄金巨柚王。</div>
+        <div class="m-desc">限时60秒，3条生命，含炸弹与5连斩黄金巨柚王。</div>
       </div>
       <div class="m-card" data-mode="zen">
         <div class="m-header">
@@ -318,13 +325,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
           <span class="m-name">30秒闪击</span>
         </div>
         <div class="m-desc">高密度密集掉落，无白柚，极限手速爆发。</div>
-      </div>
-      <div class="m-card" data-mode="hardcore">
-        <div class="m-header">
-          <span class="m-icon">💀</span>
-          <span class="m-name">命悬一线</span>
-        </div>
-        <div class="m-desc">3点生命，越切越快，绝不容失误。</div>
       </div>
     </div>
   </div>
@@ -440,7 +440,7 @@ function initDecorParticles() {
 }
 initDecorParticles();
 
-// ================= 音效 =================
+// ================= 切水果与炸弹爆炸音效 =================
 let actx = null, soundOn = true, lastSwingTime = 0;
 function initAudio() {
   try {
@@ -460,49 +460,132 @@ function playSwing(speed) {
   lastSwingTime = now;
   try {
     initAudio();
-    const dur = 0.12, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate);
+    const dur = 0.11, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / data.length) * Math.PI);
     const src = actx.createBufferSource(), flt = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = buf; flt.type = "bandpass"; flt.Q.value = 2.5;
-    const baseF = Math.min(2000, 600 + speed * 25);
-    flt.frequency.setValueAtTime(baseF * 0.5, actx.currentTime);
-    flt.frequency.exponentialRampToValueAtTime(baseF * 1.4, actx.currentTime + dur);
-    g.gain.setValueAtTime(0.12, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    src.buffer = buf; flt.type = "bandpass"; flt.Q.value = 2.8;
+    const baseF = Math.min(2200, 700 + speed * 26);
+    flt.frequency.setValueAtTime(baseF * 0.55, actx.currentTime);
+    flt.frequency.exponentialRampToValueAtTime(baseF * 1.45, actx.currentTime + dur);
+    g.gain.setValueAtTime(0.11, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
     src.connect(flt); flt.connect(g); g.connect(actx.destination); src.start();
   } catch (e) {}
 }
 
+// 切开水果音效：刀刃划裂声 + 果汁爆裂泼溅声 + 清脆音阶
 function playSlice(combo = 1, isSpecial = false) {
   if (!soundOn) return;
   try {
     initAudio();
     const t = actx.currentTime;
-    const dur = 0.18, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.045));
-    const src = actx.createBufferSource(), flt = actx.createBiquadFilter(), ng = actx.createGain();
-    src.buffer = buf; flt.type = "bandpass"; flt.frequency.value = 1650; flt.Q.value = 1.2;
-    ng.gain.setValueAtTime(0.28, t); ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(flt); flt.connect(ng); ng.connect(actx.destination); src.start();
+    const sr = actx.sampleRate;
 
+    // 1. 刀锋划破果皮瞬态撕裂噪波
+    const sliceDur = 0.085;
+    const sliceBuf = actx.createBuffer(1, Math.floor(sr * sliceDur), sr);
+    const sliceData = sliceBuf.getChannelData(0);
+    for (let i = 0; i < sliceData.length; i++) {
+      const p = i / sliceData.length;
+      sliceData[i] = (Math.random() * 2 - 1) * Math.sin(p * Math.PI) * Math.exp(-p * 2.4);
+    }
+    const sliceSrc = actx.createBufferSource();
+    sliceSrc.buffer = sliceBuf;
+    const sliceFilter = actx.createBiquadFilter();
+    sliceFilter.type = "bandpass";
+    sliceFilter.frequency.setValueAtTime(2400, t);
+    sliceFilter.frequency.exponentialRampToValueAtTime(950, t + sliceDur);
+    sliceFilter.Q.value = 1.6;
+    const sliceGain = actx.createGain();
+    sliceGain.gain.setValueAtTime(0.32, t);
+    sliceGain.gain.exponentialRampToValueAtTime(0.001, t + sliceDur);
+    sliceSrc.connect(sliceFilter); sliceFilter.connect(sliceGain); sliceGain.connect(actx.destination);
+    sliceSrc.start(t);
+
+    // 2. 果汁泼溅湿润噪波
+    const splashDur = 0.22;
+    const splashBuf = actx.createBuffer(1, Math.floor(sr * splashDur), sr);
+    const splashData = splashBuf.getChannelData(0);
+    for (let i = 0; i < splashData.length; i++) {
+      const p = i / splashData.length;
+      const flutter = 0.65 + 0.35 * Math.sin(p * 55);
+      splashData[i] = (Math.random() * 2 - 1) * flutter * Math.exp(-p * 5.2);
+    }
+    const splashSrc = actx.createBufferSource();
+    splashSrc.buffer = splashBuf;
+    const splashFilter = actx.createBiquadFilter();
+    splashFilter.type = "lowpass";
+    splashFilter.frequency.setValueAtTime(1900, t + 0.015);
+    splashFilter.frequency.exponentialRampToValueAtTime(480, t + splashDur);
+    const splashGain = actx.createGain();
+    splashGain.gain.setValueAtTime(0.26, t + 0.015);
+    splashGain.gain.exponentialRampToValueAtTime(0.001, t + splashDur);
+    splashSrc.connect(splashFilter); splashFilter.connect(splashGain); splashGain.connect(actx.destination);
+    splashSrc.start(t + 0.015);
+
+    // 3. 清脆果肉斩击音高反馈
     const scale = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
     const freq = scale[Math.min(combo - 1, scale.length - 1)] * (isSpecial ? 1.25 : 1);
     const osc = actx.createOscillator(), og = actx.createGain();
     osc.type = isSpecial ? "triangle" : "sine";
-    osc.frequency.setValueAtTime(freq, t); osc.frequency.exponentialRampToValueAtTime(freq * 1.2, t + 0.16);
-    og.gain.setValueAtTime(0.2, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    osc.connect(og); og.connect(actx.destination); osc.start(); osc.stop(t + 0.18);
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 1.22, t + 0.14);
+    og.gain.setValueAtTime(0.18, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    osc.connect(og); og.connect(actx.destination);
+    osc.start(t); osc.stop(t + 0.17);
   } catch (e) {}
 }
 
+// 炸弹爆炸音效：低频闷响冲击 + 气浪轰鸣
 function playBomb() {
   if (!soundOn) return;
   try {
     initAudio();
-    const t = actx.currentTime, osc = actx.createOscillator(), g = actx.createGain();
-    osc.type = "sawtooth"; osc.frequency.setValueAtTime(120, t); osc.frequency.exponentialRampToValueAtTime(30, t + 0.4);
-    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
-    osc.connect(g); g.connect(actx.destination); osc.start(); osc.stop(t + 0.42);
+    const t = actx.currentTime;
+    const sr = actx.sampleRate;
+
+    // 1. 次低音重炮冲击波
+    const subOsc = actx.createOscillator();
+    const subGain = actx.createGain();
+    subOsc.type = "sine";
+    subOsc.frequency.setValueAtTime(135, t);
+    subOsc.frequency.exponentialRampToValueAtTime(28, t + 0.48);
+    subGain.gain.setValueAtTime(0.55, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.52);
+    subOsc.connect(subGain); subGain.connect(actx.destination);
+    subOsc.start(t); subOsc.stop(t + 0.54);
+
+    // 2. 失真爆破核心音
+    const boomOsc = actx.createOscillator();
+    const boomGain = actx.createGain();
+    boomOsc.type = "sawtooth";
+    boomOsc.frequency.setValueAtTime(92, t);
+    boomOsc.frequency.exponentialRampToValueAtTime(24, t + 0.36);
+    boomGain.gain.setValueAtTime(0.32, t);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+    boomOsc.connect(boomGain); boomGain.connect(actx.destination);
+    boomOsc.start(t); boomOsc.stop(t + 0.4);
+
+    // 3. 爆炸气浪轰鸣噪波
+    const noiseDur = 0.65;
+    const noiseBuf = actx.createBuffer(1, Math.floor(sr * noiseDur), sr);
+    const noiseData = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i++) {
+      const p = i / noiseData.length;
+      noiseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - p, 1.8);
+    }
+    const noiseSrc = actx.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    const lpFilter = actx.createBiquadFilter();
+    lpFilter.type = "lowpass";
+    lpFilter.frequency.setValueAtTime(1150, t);
+    lpFilter.frequency.exponentialRampToValueAtTime(140, t + noiseDur);
+    const noiseGain = actx.createGain();
+    noiseGain.gain.setValueAtTime(0.52, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + noiseDur);
+    noiseSrc.connect(lpFilter); lpFilter.connect(noiseGain); noiseGain.connect(actx.destination);
+    noiseSrc.start(t);
   } catch (e) {}
 }
 
@@ -531,32 +614,35 @@ const TYPES = {
     rindLight: "#ffffff", rindMid: "#e2e8f0", rindDark: "#64748b",
     pith: "#f8fafc", flesh: "#f1f5f9", fleshDeep: "#cbd5e1", juice: "#e2e8f0",
     glow: "rgba(255,255,255,0.45)",
-    r: 42, pts: 20, ml: 75, weight: 1 // 概率为其它柚子的 1/10
+    r: 42, pts: 20, ml: 75, weight: 1
   },
   blue: {
     name: "蓝柚",
     rindLight: "#bae6fd", rindMid: "#0284c7", rindDark: "#0c4a6e",
     pith: "#e0f2fe", flesh: "#38bdf8", fleshDeep: "#0369a1", juice: "#0ea5e9",
     glow: "rgba(56,189,248,0.5)",
-    r: 42, pts: 20, ml: 75, weight: 1 // 概率为其它柚子的 1/10
+    r: 42, pts: 20, ml: 75, weight: 1
   },
   goldenKing: {
     name: "黄金巨柚王",
     rindLight: "#fef9c3", rindMid: "#eab308", rindDark: "#854d0e",
     pith: "#fefce8", flesh: "#fde047", fleshDeep: "#ca8a04", juice: "#facc15",
     glow: "rgba(250,204,21,0.55)",
-    r: 64, pts: 15, ml: 180, weight: 1 // 概率为其它柚子的 1/10
+    r: 64, pts: 15, ml: 180, weight: 1
   },
   bomb: { name: "黑炭炸弹", r: 36 }
 };
 
 const POMELO_POOL = ["red", "orange", "green", "white", "blue", "goldenKing"];
 
-function pickWeightedPomelo(mode) {
-  // 30秒闪击模式禁止出现白柚
-  const pool = mode === "blitz"
-    ? POMELO_POOL.filter(k => k !== "white")
-    : POMELO_POOL;
+function pickWeightedPomelo(mode, isFever) {
+  const pool = POMELO_POOL.filter(k => {
+    // 30秒闪击模式不出现白柚
+    if (mode === "blitz" && k === "white") return false;
+    // 狂热模式 4s 内不出现连斩皇柚
+    if (isFever && k === "goldenKing") return false;
+    return true;
+  });
   const totalWeight = pool.reduce((acc, k) => acc + TYPES[k].weight, 0);
   let r = Math.random() * totalWeight;
   for (const key of pool) {
@@ -592,17 +678,23 @@ function updateHUD() {
   document.getElementById("best-el").textContent = `最高纪录 ${uData.bestArcade}`;
 
   const pill = document.getElementById("status-pill");
-  if (state.mode === "arcade" || state.mode === "blitz") {
+  if (state.mode === "arcade") {
     const sec = Math.max(0, Math.ceil(state.timeLeft));
     const timeColor = state.bonusTimeFlash > 0 ? "#ffffff" : (sec <= 10 ? "#fb7185" : "#38bdf8");
     const bonusTag = state.bonusTimeFlash > 0
-      ? `<span style="color:#f8fafc;font-size:12px;background:rgba(255,255,255,.16);padding:2px 6px;border-radius:8px">+5s</span>`
+      ? `<span style="color:#f8fafc;font-size:11px;background:rgba(255,255,255,.16);padding:1px 5px;border-radius:6px">+5s</span>`
       : "";
-    pill.innerHTML = `<span style="color:${timeColor}">⏱ ${sec}s</span>${bonusTag}`;
-  } else if (state.mode === "hardcore") {
-    pill.innerHTML = [1, 2, 3].map(i => `<span class="heart ${i > state.lives ? "lost" : ""}">❤️</span>`).join("");
+    const hearts = [1, 2, 3].map(i => `<span class="heart ${i > state.lives ? "lost" : ""}">❤️</span>`).join("");
+    pill.innerHTML = `
+      <div class="status-row"><span style="color:${timeColor}">⏱ ${sec}s</span>${bonusTag}</div>
+      <div class="status-row">${hearts}</div>
+    `;
+  } else if (state.mode === "blitz") {
+    const sec = Math.max(0, Math.ceil(state.timeLeft));
+    const timeColor = sec <= 10 ? "#fb7185" : "#38bdf8";
+    pill.innerHTML = `<div class="status-row"><span style="color:${timeColor}">⏱ ${sec}s</span></div>`;
   } else {
-    pill.innerHTML = `<span style="color:#86efac">🍃 无限畅切</span>`;
+    pill.innerHTML = `<div class="status-row"><span style="color:#86efac">🍃 无限畅切</span></div>`;
   }
 }
 
@@ -629,7 +721,6 @@ function startGame(mode) {
   initAudio();
   syncMetaUI();
   initDecorParticles();
-  // 经典街机模式限时 60 秒；30秒闪击模式限时 30 秒
   const dur = mode === "blitz" ? 30 : (mode === "arcade" ? 60 : 9999);
   Object.assign(state, {
     running: true, mode, score: 0, lives: 3, timeLeft: dur, bonusTimeFlash: 0,
@@ -642,8 +733,7 @@ function startGame(mode) {
   const names = {
     arcade: "ARCADE · 经典街机 (60s)",
     zen: "ZEN · 禅意解压",
-    blitz: "BLITZ · 30秒闪击",
-    hardcore: "HARDCORE · 命悬一线"
+    blitz: "BLITZ · 30秒闪击"
   };
   document.getElementById("mode-tag").textContent = names[mode] || "ARCADE · 经典街机 (60s)";
   document.getElementById("mode-modal").classList.add("hidden");
@@ -686,12 +776,13 @@ function spawnWave() {
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
       if (!state.running) return;
+      const feverActive = state.feverTimer > 0;
       let kind = "red";
-      const bombChance = 0.14 + (state.mode === "hardcore" ? 0.08 : 0);
-      if ((state.mode === "arcade" || state.mode === "hardcore") && !isFever && state.waveCount > 1 && Math.random() < bombChance) {
+      const bombChance = 0.14;
+      if (state.mode === "arcade" && !feverActive && state.waveCount > 1 && Math.random() < bombChance) {
         kind = "bomb";
       } else {
-        kind = pickWeightedPomelo(state.mode);
+        kind = pickWeightedPomelo(state.mode, feverActive);
       }
 
       const cfg = TYPES[kind];
@@ -699,7 +790,7 @@ function spawnWave() {
       const x = margin + Math.random() * (W - margin * 2);
       const peakY = H * (0.15 + Math.random() * 0.25);
       const g = 980;
-      const vy = -Math.sqrt(2 * g * (H + 55 - peakY)) * (state.mode === "hardcore" ? 1.12 : 1);
+      const vy = -Math.sqrt(2 * g * (H + 55 - peakY));
       const targetX = W * 0.5 + (Math.random() - 0.5) * W * 0.6;
       const flightT = -vy / g;
       const vx = (targetX - x) / (flightT * (0.9 + Math.random() * 0.3));
@@ -707,8 +798,8 @@ function spawnWave() {
       fruits.push({
         kind, cfg, x, y: H + cfg.r + 12, vx, vy, g,
         rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 3.8,
-        hp: kind === "goldenKing" ? 4 : 1,
-        maxHp: kind === "goldenKing" ? 4 : 1,
+        hp: kind === "goldenKing" ? 5 : 1,
+        maxHp: kind === "goldenKing" ? 5 : 1,
         hitCd: 0, scale: 1
       });
     }, i * 100);
@@ -783,28 +874,33 @@ function handleSlice(f, idx, angle) {
   if (f.kind === "bomb") {
     fruits.splice(idx, 1);
     playBomb();
-    state.shake = 22; state.flash = 0.7; state.flashColor = "#ef4444";
-    if (state.mode === "hardcore") {
-      state.lives = 0;
-    } else if (state.mode === "arcade") {
-      state.timeLeft = Math.max(0, state.timeLeft - 8);
+    state.shake = 24; state.flash = 0.72; state.flashColor = "#ef4444";
+    if (state.mode === "arcade") {
+      state.lives = Math.max(0, state.lives - 1);
     }
     updateHUD();
-    spawnJuiceSplash(f.x, f.y, { juice: "#ef4444", flesh: "#1e293b", pith: "#fca5a5" }, angle, 1.3);
-    addFloatText(f.x, f.y, state.mode === "arcade" ? "💥 炸弹 -8s！" : "💥 炸弹引爆！", "#fda4af", 24);
-    if ((state.mode === "hardcore" && state.lives <= 0) || (state.mode === "arcade" && state.timeLeft <= 0)) {
+    spawnJuiceSplash(f.x, f.y, { juice: "#ef4444", flesh: "#1e293b", pith: "#fca5a5" }, angle, 1.35);
+    addFloatText(f.x, f.y, "💥 炸弹引爆 -1❤️！", "#fda4af", 24);
+    if (state.mode === "arcade" && state.lives <= 0) {
       setTimeout(endGame, 380);
     }
     return;
   }
 
+  // 连斩皇柚：需要连斩 5 次才能切开（前 4 刀累加进度，第 5 刀切开）
   if (f.kind === "goldenKing" && f.hp > 1) {
-    f.hp--; f.hitCd = 0.09; f.scale = 1.18; f.vy = Math.min(f.vy, -240);
-    playSlice(5 - f.hp, true);
+    const hitIndex = f.maxHp - f.hp + 1; // 1 ~ 4
+    f.hp--;
+    f.hitCd = 0.08;
+    f.scale = 1.18;
+    f.vy = Math.min(f.vy, -240);
+    playSlice(hitIndex, true);
     state.shake = 7;
     spawnJuiceSplash(f.x, f.y, f.cfg, angle, 0.85);
-    addFloatText(f.x, f.y - 24, `⚡ 黄金巨柚王连斩 x${5 - f.hp}! +15`, "#fde047", 23);
-    state.score += 15; state.juiceMl += 50; updateHUD();
+    addFloatText(f.x, f.y - 24, `⚡ 皇柚连斩 ${hitIndex}/5! +15`, "#fde047", 23);
+    state.score += 15;
+    state.juiceMl += 45;
+    updateHUD();
     return;
   }
 
@@ -820,9 +916,9 @@ function handleSlice(f, idx, angle) {
   const isBlue = f.kind === "blue";
   const isWhite = f.kind === "white";
 
-  playSlice(state.swipeCombo, isGoldenKing || isBlue || isWhite);
-  state.hitstop = isGoldenKing ? 0.05 : 0.025;
-  state.shake = isGoldenKing ? 15 : 7;
+  playSlice(isGoldenKing ? 5 : state.swipeCombo, isGoldenKing || isBlue || isWhite);
+  state.hitstop = isGoldenKing ? 0.055 : 0.025;
+  state.shake = isGoldenKing ? 16 : 7;
 
   if (isWhite) {
     state.timeLeft += 5;
@@ -834,9 +930,10 @@ function handleSlice(f, idx, angle) {
     state.flash = 0.32; state.flashColor = "#38bdf8";
     addFloatText(f.x, f.y - 38, "❄️ 蓝柚冰霜减速 3.5s", "#7dd3fc", 23);
   } else if (isGoldenKing) {
+    // 5连斩完成切开，进入 4 秒狂热模式
     state.feverTimer = 4;
-    state.flash = 0.36; state.flashColor = "#facc15";
-    addFloatText(f.x, f.y - 42, "👑 黄金巨柚王爆裂 · 狂热时刻!", "#fde047", 24);
+    state.flash = 0.38; state.flashColor = "#facc15";
+    addFloatText(f.x, f.y - 42, "👑 皇柚5连斩爆裂 · 狂热 4s!", "#fde047", 24);
   }
 
   const pts = f.cfg.pts * (state.feverTimer > 0 ? 2 : 1) * (state.mode === "blitz" ? 1.5 : 1);
@@ -861,7 +958,7 @@ function handleSlice(f, idx, angle) {
     });
   });
 
-  const intensity = isGoldenKing ? 1.85 : (isWhite || isBlue ? 1.25 : 1.0);
+  const intensity = isGoldenKing ? 1.9 : (isWhite || isBlue ? 1.25 : 1.0);
   spawnJuiceSplash(f.x, f.y, f.cfg, angle, intensity);
 
   const droplets = Array.from({ length: 6 }, () => {
@@ -1134,10 +1231,10 @@ function drawPomelo(f) {
     ctx.stroke();
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "900 14px 'PingFang SC',sans-serif";
+    ctx.font = "900 13px 'PingFang SC',sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`斩×${f.hp}`, 0, r * 0.13);
+    ctx.fillText(`余${f.hp}/5`, 0, r * 0.13);
   }
 
   ctx.restore();
@@ -1271,8 +1368,7 @@ function loop(now) {
     if (state.spawnTimer <= 0) {
       spawnWave();
       const blitzMult = state.mode === "blitz" ? 0.65 : 1;
-      const hardcoreMult = state.mode === "hardcore" ? Math.max(0.45, 1.1 - state.score / 600) : 1;
-      state.spawnTimer = (state.feverTimer > 0 ? 0.7 : Math.max(0.8, 1.8 - state.score / 1000)) * blitzMult * hardcoreMult;
+      state.spawnTimer = (state.feverTimer > 0 ? 0.7 : Math.max(0.8, 1.8 - state.score / 1000)) * blitzMult;
     }
   }
 
@@ -1333,8 +1429,9 @@ function loop(now) {
 
     if (f.y > H + f.cfg.r + 55 && f.vy > 0) {
       fruits.splice(i, 1);
-      if (state.running && state.mode === "hardcore" && f.kind !== "bomb" && f.kind !== "goldenKing") {
-        state.lives--; updateHUD();
+      if (state.running && state.mode === "arcade" && f.kind !== "bomb" && f.kind !== "goldenKing") {
+        state.lives = Math.max(0, state.lives - 1);
+        updateHUD();
         addFloatText(Math.min(W - 60, Math.max(60, f.x)), H - 45, "漏掉柚子 -1❤️", "#fb7185", 18);
         if (state.lives <= 0) endGame();
       }
@@ -1446,7 +1543,7 @@ updateHUD();
 requestAnimationFrame(loop);
 
 const urlMode = new URLSearchParams(window.location.search).get("mode");
-if (urlMode && ["arcade", "zen", "blitz", "hardcore"].includes(urlMode)) {
+if (urlMode && ["arcade", "zen", "blitz"].includes(urlMode)) {
   startGame(urlMode);
 }
 })();
