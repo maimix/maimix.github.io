@@ -163,8 +163,80 @@
         return localList.slice(0, limit);
       }
 
-      // 合并本地与云端最高分，避免离线未同步数据丢失
       const map = new Map();
       localList.forEach(item => {
         if (item && item.name) map.set(item.name, Number(item.score) || 0);
       });
+      data.forEach(item => {
+        if (item && item.name) {
+          const prev = map.get(item.name) || 0;
+          map.set(item.name, Math.max(prev, Number(item.score) || 0));
+        }
+      });
+
+      const merged = Array.from(map.entries())
+        .map(([name, score]) => ({ name, score }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      try {
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(merged));
+      } catch (e) {}
+
+      return merged;
+    } catch (err) {
+      return localList.slice(0, limit);
+    }
+  }
+
+  function evaluateNewAchievements(username = getCurrentUser()) {
+    const uData = getUserData(username);
+    const newlyUnlocked = [];
+    ACHIEVEMENTS_DEF.forEach(ach => {
+      if (!uData.unlockedAch.includes(ach.id) && ach.check(uData)) {
+        uData.unlockedAch.push(ach.id);
+        newlyUnlocked.push(ach);
+      }
+    });
+    if (newlyUnlocked.length > 0) {
+      try {
+        localStorage.setItem(`pomelo_user_${username}`, JSON.stringify(uData));
+      } catch (e) {}
+    }
+    return newlyUnlocked;
+  }
+
+  function getDecorConfig() {
+    try {
+      const raw = localStorage.getItem(DECOR_KEY);
+      if (!raw) return { ...DEFAULT_DECOR };
+      return { ...DEFAULT_DECOR, ...JSON.parse(raw) };
+    } catch (e) {
+      return { ...DEFAULT_DECOR };
+    }
+  }
+
+  function saveDecorConfig(partialOrFull) {
+    const next = { ...getDecorConfig(), ...(partialOrFull || {}) };
+    try {
+      localStorage.setItem(DECOR_KEY, JSON.stringify(next));
+    } catch (e) {}
+    return next;
+  }
+
+  initSupabase();
+
+  global.PomeloCloud = {
+    ACHIEVEMENTS_DEF,
+    initSupabase,
+    getCurrentUser,
+    setCurrentUser,
+    getUserData,
+    saveUserData,
+    fetchLeaderboard,
+    getLocalLeaderboard,
+    evaluateNewAchievements,
+    getDecorConfig,
+    saveDecorConfig
+  };
+})(window);
