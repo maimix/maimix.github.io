@@ -7,6 +7,7 @@
 <title>柚刃 · 游戏玩法</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./cloud.js"></script>
+<script src="./sound.js"></script>
 <style>
 :root{
   --safe-top:env(safe-area-inset-top,0px);
@@ -355,7 +356,19 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 "use strict";
 
 const Cloud = window.PomeloCloud;
+const Sound = window.PomeloSound;
 Cloud.initSupabase();
+
+const sndBtn = document.getElementById("snd-btn");
+function syncSoundIcon() {
+  sndBtn.textContent = Sound && Sound.isMuted() ? "🔇" : "🔊";
+}
+syncSoundIcon();
+sndBtn.onclick = () => {
+  if (!Sound) return;
+  Sound.toggleMute();
+  syncSoundIcon();
+};
 
 let toastTimer = null;
 function showToast(msg) {
@@ -390,7 +403,7 @@ async function commitSessionAndAchievements() {
   const newlyUnlocked = Cloud.evaluateNewAchievements(currentUser);
   newlyUnlocked.forEach(ach => {
     addFloatText(W * 0.5, H * 0.25, `🏆 解锁成就: ${ach.name}!`, "#fde047", 24);
-    playSlice(8, true);
+    if (Sound) Sound.playSlice(8, true);
   });
 }
 
@@ -440,155 +453,6 @@ function initDecorParticles() {
 }
 initDecorParticles();
 
-// ================= 切水果与炸弹爆炸音效 =================
-let actx = null, soundOn = true, lastSwingTime = 0;
-function initAudio() {
-  try {
-    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-    if (actx && actx.state === "suspended") actx.resume();
-  } catch (e) {}
-}
-document.getElementById("snd-btn").onclick = () => {
-  soundOn = !soundOn;
-  document.getElementById("snd-btn").textContent = soundOn ? "🔊" : "🔇";
-};
-
-function playSwing(speed) {
-  if (!soundOn) return;
-  const now = performance.now();
-  if (now - lastSwingTime < 95) return;
-  lastSwingTime = now;
-  try {
-    initAudio();
-    const dur = 0.11, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / data.length) * Math.PI);
-    const src = actx.createBufferSource(), flt = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = buf; flt.type = "bandpass"; flt.Q.value = 2.8;
-    const baseF = Math.min(2200, 700 + speed * 26);
-    flt.frequency.setValueAtTime(baseF * 0.55, actx.currentTime);
-    flt.frequency.exponentialRampToValueAtTime(baseF * 1.45, actx.currentTime + dur);
-    g.gain.setValueAtTime(0.11, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-    src.connect(flt); flt.connect(g); g.connect(actx.destination); src.start();
-  } catch (e) {}
-}
-
-// 切开水果音效：刀刃划裂声 + 果汁爆裂泼溅声 + 清脆音阶
-function playSlice(combo = 1, isSpecial = false) {
-  if (!soundOn) return;
-  try {
-    initAudio();
-    const t = actx.currentTime;
-    const sr = actx.sampleRate;
-
-    // 1. 刀锋划破果皮瞬态撕裂噪波
-    const sliceDur = 0.085;
-    const sliceBuf = actx.createBuffer(1, Math.floor(sr * sliceDur), sr);
-    const sliceData = sliceBuf.getChannelData(0);
-    for (let i = 0; i < sliceData.length; i++) {
-      const p = i / sliceData.length;
-      sliceData[i] = (Math.random() * 2 - 1) * Math.sin(p * Math.PI) * Math.exp(-p * 2.4);
-    }
-    const sliceSrc = actx.createBufferSource();
-    sliceSrc.buffer = sliceBuf;
-    const sliceFilter = actx.createBiquadFilter();
-    sliceFilter.type = "bandpass";
-    sliceFilter.frequency.setValueAtTime(2400, t);
-    sliceFilter.frequency.exponentialRampToValueAtTime(950, t + sliceDur);
-    sliceFilter.Q.value = 1.6;
-    const sliceGain = actx.createGain();
-    sliceGain.gain.setValueAtTime(0.32, t);
-    sliceGain.gain.exponentialRampToValueAtTime(0.001, t + sliceDur);
-    sliceSrc.connect(sliceFilter); sliceFilter.connect(sliceGain); sliceGain.connect(actx.destination);
-    sliceSrc.start(t);
-
-    // 2. 果汁泼溅湿润噪波
-    const splashDur = 0.22;
-    const splashBuf = actx.createBuffer(1, Math.floor(sr * splashDur), sr);
-    const splashData = splashBuf.getChannelData(0);
-    for (let i = 0; i < splashData.length; i++) {
-      const p = i / splashData.length;
-      const flutter = 0.65 + 0.35 * Math.sin(p * 55);
-      splashData[i] = (Math.random() * 2 - 1) * flutter * Math.exp(-p * 5.2);
-    }
-    const splashSrc = actx.createBufferSource();
-    splashSrc.buffer = splashBuf;
-    const splashFilter = actx.createBiquadFilter();
-    splashFilter.type = "lowpass";
-    splashFilter.frequency.setValueAtTime(1900, t + 0.015);
-    splashFilter.frequency.exponentialRampToValueAtTime(480, t + splashDur);
-    const splashGain = actx.createGain();
-    splashGain.gain.setValueAtTime(0.26, t + 0.015);
-    splashGain.gain.exponentialRampToValueAtTime(0.001, t + splashDur);
-    splashSrc.connect(splashFilter); splashFilter.connect(splashGain); splashGain.connect(actx.destination);
-    splashSrc.start(t + 0.015);
-
-    // 3. 清脆果肉斩击音高反馈
-    const scale = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
-    const freq = scale[Math.min(combo - 1, scale.length - 1)] * (isSpecial ? 1.25 : 1);
-    const osc = actx.createOscillator(), og = actx.createGain();
-    osc.type = isSpecial ? "triangle" : "sine";
-    osc.frequency.setValueAtTime(freq, t);
-    osc.frequency.exponentialRampToValueAtTime(freq * 1.22, t + 0.14);
-    og.gain.setValueAtTime(0.18, t);
-    og.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    osc.connect(og); og.connect(actx.destination);
-    osc.start(t); osc.stop(t + 0.17);
-  } catch (e) {}
-}
-
-// 炸弹爆炸音效：低频闷响冲击 + 气浪轰鸣
-function playBomb() {
-  if (!soundOn) return;
-  try {
-    initAudio();
-    const t = actx.currentTime;
-    const sr = actx.sampleRate;
-
-    // 1. 次低音重炮冲击波
-    const subOsc = actx.createOscillator();
-    const subGain = actx.createGain();
-    subOsc.type = "sine";
-    subOsc.frequency.setValueAtTime(135, t);
-    subOsc.frequency.exponentialRampToValueAtTime(28, t + 0.48);
-    subGain.gain.setValueAtTime(0.55, t);
-    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.52);
-    subOsc.connect(subGain); subGain.connect(actx.destination);
-    subOsc.start(t); subOsc.stop(t + 0.54);
-
-    // 2. 失真爆破核心音
-    const boomOsc = actx.createOscillator();
-    const boomGain = actx.createGain();
-    boomOsc.type = "sawtooth";
-    boomOsc.frequency.setValueAtTime(92, t);
-    boomOsc.frequency.exponentialRampToValueAtTime(24, t + 0.36);
-    boomGain.gain.setValueAtTime(0.32, t);
-    boomGain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-    boomOsc.connect(boomGain); boomGain.connect(actx.destination);
-    boomOsc.start(t); boomOsc.stop(t + 0.4);
-
-    // 3. 爆炸气浪轰鸣噪波
-    const noiseDur = 0.65;
-    const noiseBuf = actx.createBuffer(1, Math.floor(sr * noiseDur), sr);
-    const noiseData = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) {
-      const p = i / noiseData.length;
-      noiseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - p, 1.8);
-    }
-    const noiseSrc = actx.createBufferSource();
-    noiseSrc.buffer = noiseBuf;
-    const lpFilter = actx.createBiquadFilter();
-    lpFilter.type = "lowpass";
-    lpFilter.frequency.setValueAtTime(1150, t);
-    lpFilter.frequency.exponentialRampToValueAtTime(140, t + noiseDur);
-    const noiseGain = actx.createGain();
-    noiseGain.gain.setValueAtTime(0.52, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + noiseDur);
-    noiseSrc.connect(lpFilter); lpFilter.connect(noiseGain); noiseGain.connect(actx.destination);
-    noiseSrc.start(t);
-  } catch (e) {}
-}
-
 // ================= 六大柚子配置与 1/10 稀有概率 =================
 const TYPES = {
   red: {
@@ -637,9 +501,7 @@ const POMELO_POOL = ["red", "orange", "green", "white", "blue", "goldenKing"];
 
 function pickWeightedPomelo(mode, isFever) {
   const pool = POMELO_POOL.filter(k => {
-    // 30秒闪击模式不出现白柚
     if (mode === "blitz" && k === "white") return false;
-    // 狂热模式 4s 内不出现连斩皇柚
     if (isFever && k === "goldenKing") return false;
     return true;
   });
@@ -718,7 +580,7 @@ document.querySelectorAll(".m-card").forEach(card => {
 });
 
 function startGame(mode) {
-  initAudio();
+  if (Sound) Sound.initAudio();
   syncMetaUI();
   initDecorParticles();
   const dur = mode === "blitz" ? 30 : (mode === "arcade" ? 60 : 9999);
@@ -813,7 +675,7 @@ function addPoint(x, y) {
     const prev = trail[trail.length - 1];
     const dist = Math.hypot(x - prev.x, y - prev.y);
     if (dist > 5) {
-      playSwing(dist);
+      if (Sound) Sound.playSwing(dist);
       checkSliceSegment(prev.x, prev.y, x, y);
       if (Math.random() < 0.45) {
         const cfg = BLADE_CONFIGS[decorConfig.bladeSkin] || BLADE_CONFIGS.flame;
@@ -873,7 +735,7 @@ function checkSliceSegment(x1, y1, x2, y2) {
 function handleSlice(f, idx, angle) {
   if (f.kind === "bomb") {
     fruits.splice(idx, 1);
-    playBomb();
+    if (Sound) Sound.playBomb();
     state.shake = 24; state.flash = 0.72; state.flashColor = "#ef4444";
     if (state.mode === "arcade") {
       state.lives = Math.max(0, state.lives - 1);
@@ -887,14 +749,13 @@ function handleSlice(f, idx, angle) {
     return;
   }
 
-  // 连斩皇柚：需要连斩 5 次才能切开（前 4 刀累加进度，第 5 刀切开）
   if (f.kind === "goldenKing" && f.hp > 1) {
-    const hitIndex = f.maxHp - f.hp + 1; // 1 ~ 4
+    const hitIndex = f.maxHp - f.hp + 1;
     f.hp--;
     f.hitCd = 0.08;
     f.scale = 1.18;
     f.vy = Math.min(f.vy, -240);
-    playSlice(hitIndex, true);
+    if (Sound) Sound.playSlice(hitIndex, true);
     state.shake = 7;
     spawnJuiceSplash(f.x, f.y, f.cfg, angle, 0.85);
     addFloatText(f.x, f.y - 24, `⚡ 皇柚连斩 ${hitIndex}/5! +15`, "#fde047", 23);
@@ -916,7 +777,7 @@ function handleSlice(f, idx, angle) {
   const isBlue = f.kind === "blue";
   const isWhite = f.kind === "white";
 
-  playSlice(isGoldenKing ? 5 : state.swipeCombo, isGoldenKing || isBlue || isWhite);
+  if (Sound) Sound.playSlice(isGoldenKing ? 5 : state.swipeCombo, isGoldenKing || isBlue || isWhite);
   state.hitstop = isGoldenKing ? 0.055 : 0.025;
   state.shake = isGoldenKing ? 16 : 7;
 
@@ -930,7 +791,6 @@ function handleSlice(f, idx, angle) {
     state.flash = 0.32; state.flashColor = "#38bdf8";
     addFloatText(f.x, f.y - 38, "❄️ 蓝柚冰霜减速 3.5s", "#7dd3fc", 23);
   } else if (isGoldenKing) {
-    // 5连斩完成切开，进入 4 秒狂热模式
     state.feverTimer = 4;
     state.flash = 0.38; state.flashColor = "#facc15";
     addFloatText(f.x, f.y - 42, "👑 皇柚5连斩爆裂 · 狂热 4s!", "#fde047", 24);
