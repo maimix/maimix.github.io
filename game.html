@@ -259,13 +259,13 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 <div class="hud">
   <div class="top-bar">
     <div class="score-box">
-      <div class="score-label" id="mode-tag">ARCADE · 街机模式</div>
+      <div class="score-label" id="mode-tag">ARCADE · 经典街机 (60s)</div>
       <div class="score-val" id="score-el">0</div>
       <div class="best-val" id="best-el">最高纪录 0</div>
     </div>
     <div class="right-hud">
       <div class="status-pill" id="status-pill">
-        <span id="timer-display" style="color:#38bdf8">⏱ 60s</span>
+        <span style="color:#38bdf8">⏱ 60s</span>
       </div>
       <button class="icon-btn" id="snd-btn" title="音效开关">🔊</button>
       <button class="icon-btn" id="home-btn" title="暂停/选关">⏸</button>
@@ -553,8 +553,9 @@ const TYPES = {
 const POMELO_POOL = ["red", "orange", "green", "white", "blue", "goldenKing"];
 
 function pickWeightedPomelo(mode) {
+  // 30秒闪击模式禁止出现白柚
   const pool = mode === "blitz"
-    ? POMELO_POOL.filter(k => k !== "white") // 30秒闪击模式不出现白柚
+    ? POMELO_POOL.filter(k => k !== "white")
     : POMELO_POOL;
   const totalWeight = pool.reduce((acc, k) => acc + TYPES[k].weight, 0);
   let r = Math.random() * totalWeight;
@@ -628,6 +629,7 @@ function startGame(mode) {
   initAudio();
   syncMetaUI();
   initDecorParticles();
+  // 经典街机模式限时 60 秒；30秒闪击模式限时 30 秒
   const dur = mode === "blitz" ? 30 : (mode === "arcade" ? 60 : 9999);
   Object.assign(state, {
     running: true, mode, score: 0, lives: 3, timeLeft: dur, bonusTimeFlash: 0,
@@ -796,7 +798,6 @@ function handleSlice(f, idx, angle) {
     return;
   }
 
-  // 黄金巨柚王：多段连斩判定
   if (f.kind === "goldenKing" && f.hp > 1) {
     f.hp--; f.hitCd = 0.09; f.scale = 1.18; f.vy = Math.min(f.vy, -240);
     playSlice(5 - f.hp, true);
