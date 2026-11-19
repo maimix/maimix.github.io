@@ -293,7 +293,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
       <span class="p-tag">🔴 红柚/🟠 橙柚/🟢 绿柚</span>
       <span class="p-tag" style="border-color:rgba(248,250,252,.4);color:#f8fafc">⚪ 白柚 +5s</span>
       <span class="p-tag" style="border-color:rgba(56,189,248,.4);color:#7dd3fc">🔵 蓝柚 冰霜减速</span>
-      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 黄色大柚子 连斩狂热</span>
+      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 皇柚 连斩狂热</span>
     </div>
 
     <div class="mode-grid">
@@ -541,7 +541,7 @@ const TYPES = {
     r: 42, pts: 20, ml: 75, weight: 1 // 概率为其它柚子的 1/10
   },
   yellowKing: {
-    name: "连斩黄色大柚子",
+    name: "连斩皇柚",
     rindLight: "#fef9c3", rindMid: "#eab308", rindDark: "#854d0e",
     pith: "#fefce8", flesh: "#fde047", fleshDeep: "#ca8a04", juice: "#facc15",
     glow: "rgba(250,204,21,0.55)",
@@ -788,7 +788,7 @@ function handleSlice(f, idx, angle) {
     return;
   }
 
-  // 连斩黄色大柚子：多段连斩判定
+  // 连斩皇柚：多段连斩判定
   if (f.kind === "yellowKing" && f.hp > 1) {
     f.hp--; f.hitCd = 0.09; f.scale = 1.18; f.vy = Math.min(f.vy, -240);
     playSlice(5 - f.hp, true);
@@ -1036,7 +1036,7 @@ function drawPomelo(f) {
     return;
   }
 
-  // 1. 稀有柚子外围能量光环（白柚/蓝柚/连斩黄色大柚子）
+  // 1. 稀有柚子外围能量光环（白柚/蓝柚/连斩皇柚）
   if (f.cfg.glow) {
     const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.08;
     const glow = ctx.createRadialGradient(0, 0, r * 0.65, 0, 0, r * 1.45 * pulse);
@@ -1131,7 +1131,7 @@ function drawPomelo(f) {
   ctx.fill();
   ctx.restore();
 
-  // 8. 连斩黄色大柚子：专属多段连斩进度环与徽记
+  // 8. 连斩皇柚：专属多段连斩进度环与徽记
   if (f.kind === "yellowKing") {
     ctx.strokeStyle = "rgba(0,0,0,0.45)";
     ctx.lineWidth = 5;
