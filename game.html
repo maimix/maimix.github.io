@@ -77,6 +77,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
   font-weight:700;
   box-shadow:0 8px 24px rgba(0,0,0,.3);
   white-space:nowrap;
+  font-variant-numeric:tabular-nums;
 }
 .heart{transition:transform .25s,opacity .25s;filter:drop-shadow(0 0 6px rgba(244,63,94,.5))}
 .heart.lost{opacity:.25;transform:scale(.75);filter:grayscale(1)}
@@ -264,7 +265,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
     </div>
     <div class="right-hud">
       <div class="status-pill" id="status-pill">
-        <span class="heart" id="h1">❤️</span><span class="heart" id="h2">❤️</span><span class="heart" id="h3">❤️</span>
+        <span id="timer-display" style="color:#38bdf8">⏱ 60s</span>
       </div>
       <button class="icon-btn" id="snd-btn" title="音效开关">🔊</button>
       <button class="icon-btn" id="home-btn" title="暂停/选关">⏸</button>
@@ -293,7 +294,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
       <span class="p-tag">🔴 红柚/🟠 橙柚/🟢 绿柚</span>
       <span class="p-tag" style="border-color:rgba(248,250,252,.4);color:#f8fafc">⚪ 白柚 +5s</span>
       <span class="p-tag" style="border-color:rgba(56,189,248,.4);color:#7dd3fc">🔵 蓝柚 冰霜减速</span>
-      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 皇柚 连斩狂热</span>
+      <span class="p-tag" style="border-color:rgba(250,204,21,.45);color:#fde047">🟡 黄金巨柚王 连斩狂热</span>
     </div>
 
     <div class="mode-grid">
@@ -302,7 +303,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
           <span class="m-icon">🎯</span>
           <span class="m-name">经典街机</span>
         </div>
-        <div class="m-desc">3点生命，白柚延长时间，警惕炸弹。</div>
+        <div class="m-desc">限时60秒，右上角倒计时，含炸弹与黄金巨柚王。</div>
       </div>
       <div class="m-card" data-mode="zen">
         <div class="m-header">
@@ -316,7 +317,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
           <span class="m-icon">⚡</span>
           <span class="m-name">30秒闪击</span>
         </div>
-        <div class="m-desc">高密度密集掉落，切白柚续航+5s。</div>
+        <div class="m-desc">高密度密集掉落，无白柚，极限手速爆发。</div>
       </div>
       <div class="m-card" data-mode="hardcore">
         <div class="m-header">
@@ -477,7 +478,6 @@ function playSlice(combo = 1, isSpecial = false) {
   try {
     initAudio();
     const t = actx.currentTime;
-    // 清脆斩切 + 多汁爆裂声
     const dur = 0.18, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.045));
     const src = actx.createBufferSource(), flt = actx.createBiquadFilter(), ng = actx.createGain();
@@ -540,8 +540,8 @@ const TYPES = {
     glow: "rgba(56,189,248,0.5)",
     r: 42, pts: 20, ml: 75, weight: 1 // 概率为其它柚子的 1/10
   },
-  yellowKing: {
-    name: "连斩皇柚",
+  goldenKing: {
+    name: "黄金巨柚王",
     rindLight: "#fef9c3", rindMid: "#eab308", rindDark: "#854d0e",
     pith: "#fefce8", flesh: "#fde047", fleshDeep: "#ca8a04", juice: "#facc15",
     glow: "rgba(250,204,21,0.55)",
@@ -550,21 +550,23 @@ const TYPES = {
   bomb: { name: "黑炭炸弹", r: 36 }
 };
 
-const POMELO_POOL = ["red", "orange", "green", "white", "blue", "yellowKing"];
-const TOTAL_POMELO_WEIGHT = POMELO_POOL.reduce((acc, k) => acc + TYPES[k].weight, 0);
+const POMELO_POOL = ["red", "orange", "green", "white", "blue", "goldenKing"];
 
-function pickWeightedPomelo() {
-  let r = Math.random() * TOTAL_POMELO_WEIGHT;
-  for (const key of POMELO_POOL) {
+function pickWeightedPomelo(mode) {
+  const pool = mode === "blitz"
+    ? POMELO_POOL.filter(k => k !== "white") // 30秒闪击模式不出现白柚
+    : POMELO_POOL;
+  const totalWeight = pool.reduce((acc, k) => acc + TYPES[k].weight, 0);
+  let r = Math.random() * totalWeight;
+  for (const key of pool) {
     r -= TYPES[key].weight;
     if (r <= 0) return key;
   }
   return "red";
 }
 
-// 预生成油胞颗粒采样点（保证每个柚子旋转时表面纹理稳定不闪烁）
 const PORE_SAMPLES = Array.from({ length: 34 }, (_, i) => {
-  const angle = i * 2.3999632; // 黄金角分布
+  const angle = i * 2.3999632;
   const dist = Math.sqrt((i + 0.5) / 34) * 0.84;
   return {
     dx: Math.cos(angle) * dist,
@@ -589,16 +591,17 @@ function updateHUD() {
   document.getElementById("best-el").textContent = `最高纪录 ${uData.bestArcade}`;
 
   const pill = document.getElementById("status-pill");
-  if (state.mode === "arcade" || state.mode === "hardcore") {
-    const hearts = [1, 2, 3].map(i => `<span class="heart ${i > state.lives ? "lost" : ""}">❤️</span>`).join("");
-    const bonusBadge = state.bonusTimeFlash > 0
-      ? `<span style="color:#f8fafc;font-size:12px;background:rgba(255,255,255,.16);padding:2px 6px;border-radius:8px">+5s</span>`
-      : "";
-    pill.innerHTML = `${hearts}${bonusBadge}`;
-  } else {
+  if (state.mode === "arcade" || state.mode === "blitz") {
     const sec = Math.max(0, Math.ceil(state.timeLeft));
     const timeColor = state.bonusTimeFlash > 0 ? "#ffffff" : (sec <= 10 ? "#fb7185" : "#38bdf8");
-    pill.innerHTML = `<span style="color:${timeColor}">⏱ ${sec}s</span>`;
+    const bonusTag = state.bonusTimeFlash > 0
+      ? `<span style="color:#f8fafc;font-size:12px;background:rgba(255,255,255,.16);padding:2px 6px;border-radius:8px">+5s</span>`
+      : "";
+    pill.innerHTML = `<span style="color:${timeColor}">⏱ ${sec}s</span>${bonusTag}`;
+  } else if (state.mode === "hardcore") {
+    pill.innerHTML = [1, 2, 3].map(i => `<span class="heart ${i > state.lives ? "lost" : ""}">❤️</span>`).join("");
+  } else {
+    pill.innerHTML = `<span style="color:#86efac">🍃 无限畅切</span>`;
   }
 }
 
@@ -625,7 +628,7 @@ function startGame(mode) {
   initAudio();
   syncMetaUI();
   initDecorParticles();
-  const dur = mode === "blitz" ? 30 : (mode === "zen" ? 9999 : 60);
+  const dur = mode === "blitz" ? 30 : (mode === "arcade" ? 60 : 9999);
   Object.assign(state, {
     running: true, mode, score: 0, lives: 3, timeLeft: dur, bonusTimeFlash: 0,
     spawnTimer: 0.3, waveCount: 0, freezeTimer: 0, feverTimer: 0,
@@ -635,12 +638,12 @@ function startGame(mode) {
   fruits = []; halves = []; particles = []; shockwaves = []; stains = []; floatTexts = []; trail = [];
 
   const names = {
-    arcade: "ARCADE · 街机模式",
+    arcade: "ARCADE · 经典街机 (60s)",
     zen: "ZEN · 禅意解压",
     blitz: "BLITZ · 30秒闪击",
     hardcore: "HARDCORE · 命悬一线"
   };
-  document.getElementById("mode-tag").textContent = names[mode] || "ARCADE · 街机模式";
+  document.getElementById("mode-tag").textContent = names[mode] || "ARCADE · 经典街机 (60s)";
   document.getElementById("mode-modal").classList.add("hidden");
   document.getElementById("end-modal").classList.add("hidden");
   updateHUD();
@@ -686,7 +689,7 @@ function spawnWave() {
       if ((state.mode === "arcade" || state.mode === "hardcore") && !isFever && state.waveCount > 1 && Math.random() < bombChance) {
         kind = "bomb";
       } else {
-        kind = pickWeightedPomelo();
+        kind = pickWeightedPomelo(state.mode);
       }
 
       const cfg = TYPES[kind];
@@ -702,8 +705,8 @@ function spawnWave() {
       fruits.push({
         kind, cfg, x, y: H + cfg.r + 12, vx, vy, g,
         rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 3.8,
-        hp: kind === "yellowKing" ? 4 : 1,
-        maxHp: kind === "yellowKing" ? 4 : 1,
+        hp: kind === "goldenKing" ? 4 : 1,
+        maxHp: kind === "goldenKing" ? 4 : 1,
         hitCd: 0, scale: 1
       });
     }, i * 100);
@@ -779,22 +782,27 @@ function handleSlice(f, idx, angle) {
     fruits.splice(idx, 1);
     playBomb();
     state.shake = 22; state.flash = 0.7; state.flashColor = "#ef4444";
-    if (state.mode === "hardcore") state.lives = 0;
-    else state.lives--;
+    if (state.mode === "hardcore") {
+      state.lives = 0;
+    } else if (state.mode === "arcade") {
+      state.timeLeft = Math.max(0, state.timeLeft - 8);
+    }
     updateHUD();
     spawnJuiceSplash(f.x, f.y, { juice: "#ef4444", flesh: "#1e293b", pith: "#fca5a5" }, angle, 1.3);
-    addFloatText(f.x, f.y, "💥 炸弹引爆！", "#fda4af", 24);
-    if (state.lives <= 0) setTimeout(endGame, 380);
+    addFloatText(f.x, f.y, state.mode === "arcade" ? "💥 炸弹 -8s！" : "💥 炸弹引爆！", "#fda4af", 24);
+    if ((state.mode === "hardcore" && state.lives <= 0) || (state.mode === "arcade" && state.timeLeft <= 0)) {
+      setTimeout(endGame, 380);
+    }
     return;
   }
 
-  // 连斩皇柚：多段连斩判定
-  if (f.kind === "yellowKing" && f.hp > 1) {
+  // 黄金巨柚王：多段连斩判定
+  if (f.kind === "goldenKing" && f.hp > 1) {
     f.hp--; f.hitCd = 0.09; f.scale = 1.18; f.vy = Math.min(f.vy, -240);
     playSlice(5 - f.hp, true);
     state.shake = 7;
     spawnJuiceSplash(f.x, f.y, f.cfg, angle, 0.85);
-    addFloatText(f.x, f.y - 24, `⚡ 黄金连斩 x${5 - f.hp}! +15`, "#fde047", 23);
+    addFloatText(f.x, f.y - 24, `⚡ 黄金巨柚王连斩 x${5 - f.hp}! +15`, "#fde047", 23);
     state.score += 15; state.juiceMl += 50; updateHUD();
     return;
   }
@@ -807,15 +815,14 @@ function handleSlice(f, idx, angle) {
   state.lastSwipePos = { x: f.x, y: f.y };
   if (state.swipeCombo > state.maxCombo) state.maxCombo = state.swipeCombo;
 
-  const isYellowKing = f.kind === "yellowKing";
+  const isGoldenKing = f.kind === "goldenKing";
   const isBlue = f.kind === "blue";
   const isWhite = f.kind === "white";
 
-  playSlice(state.swipeCombo, isYellowKing || isBlue || isWhite);
-  state.hitstop = isYellowKing ? 0.05 : 0.025;
-  state.shake = isYellowKing ? 15 : 7;
+  playSlice(state.swipeCombo, isGoldenKing || isBlue || isWhite);
+  state.hitstop = isGoldenKing ? 0.05 : 0.025;
+  state.shake = isGoldenKing ? 15 : 7;
 
-  // 特殊柚子技能触发
   if (isWhite) {
     state.timeLeft += 5;
     state.bonusTimeFlash = 1.4;
@@ -825,18 +832,17 @@ function handleSlice(f, idx, angle) {
     state.freezeTimer = 3.5;
     state.flash = 0.32; state.flashColor = "#38bdf8";
     addFloatText(f.x, f.y - 38, "❄️ 蓝柚冰霜减速 3.5s", "#7dd3fc", 23);
-  } else if (isYellowKing) {
+  } else if (isGoldenKing) {
     state.feverTimer = 4;
     state.flash = 0.36; state.flashColor = "#facc15";
-    addFloatText(f.x, f.y - 42, "👑 黄金大柚爆裂 · 狂热时刻!", "#fde047", 24);
+    addFloatText(f.x, f.y - 42, "👑 黄金巨柚王爆裂 · 狂热时刻!", "#fde047", 24);
   }
 
   const pts = f.cfg.pts * (state.feverTimer > 0 ? 2 : 1) * (state.mode === "blitz" ? 1.5 : 1);
   state.score += Math.round(pts);
   updateHUD();
-  addFloatText(f.x, f.y, `+${Math.round(pts)}`, f.cfg.flesh, isYellowKing ? 27 : 20);
+  addFloatText(f.x, f.y, `+${Math.round(pts)}`, f.cfg.flesh, isGoldenKing ? 27 : 20);
 
-  // 生成左右两片 3D 立体柚子瓣
   const perp = angle + Math.PI / 2;
   [-1, 1].forEach(side => {
     halves.push({
@@ -847,18 +853,16 @@ function handleSlice(f, idx, angle) {
       vy: f.vy * 0.65 - (85 + Math.random() * 45),
       rot: angle,
       vr: side * (3.2 + Math.random() * 2.8),
-      flip: 0.38 + Math.random() * 0.25, // 3D 截面翻开角度 (0~1)
+      flip: 0.38 + Math.random() * 0.25,
       vflip: 1.6 + Math.random() * 1.1,
       side,
       alpha: 1
     });
   });
 
-  // 触发多层次爆汁特效
-  const intensity = isYellowKing ? 1.85 : (isWhite || isBlue ? 1.25 : 1.0);
+  const intensity = isGoldenKing ? 1.85 : (isWhite || isBlue ? 1.25 : 1.0);
   spawnJuiceSplash(f.x, f.y, f.cfg, angle, intensity);
 
-  // 背景残留果渍（带随机溅射小水珠）
   const droplets = Array.from({ length: 6 }, () => {
     const a = Math.random() * Math.PI * 2;
     const d = f.cfg.r * (0.8 + Math.random() * 0.85);
@@ -866,7 +870,7 @@ function handleSlice(f, idx, angle) {
   });
   stains.push({
     x: f.x, y: f.y,
-    r: f.cfg.r * (isYellowKing ? 1.45 : 1.08),
+    r: f.cfg.r * (isGoldenKing ? 1.45 : 1.08),
     color: f.cfg.juice,
     highlight: f.cfg.flesh,
     droplets,
@@ -875,9 +879,7 @@ function handleSlice(f, idx, angle) {
   if (stains.length > 22) stains.shift();
 }
 
-// ================= 拟真爆汁特效系统 =================
 function spawnJuiceSplash(x, y, cfg, sliceAngle, intensity = 1) {
-  // 1. 空气果汁薄雾冲击波
   shockwaves.push({
     x, y,
     r: 12 * intensity,
@@ -888,7 +890,6 @@ function spawnJuiceSplash(x, y, cfg, sliceAngle, intensity = 1) {
     maxLife: 0.32
   });
 
-  // 2. 沿刀光切线方向高速喷射的水柱与液滴
   const jetCount = Math.round(16 * intensity);
   for (let i = 0; i < jetCount; i++) {
     const dir = i % 2 === 0 ? sliceAngle : sliceAngle + Math.PI;
@@ -909,7 +910,6 @@ function spawnJuiceSplash(x, y, cfg, sliceAngle, intensity = 1) {
     });
   }
 
-  // 3. 360度飞溅的饱满果汁球与晶莹果粒碎片
   const burstCount = Math.round(22 * intensity);
   for (let i = 0; i < burstCount; i++) {
     const a = Math.random() * Math.PI * 2;
@@ -963,7 +963,6 @@ function drawBackground() {
     ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
   }
 
-  // 冰霜减速全屏寒气边缘提示
   if (state.freezeTimer > 0) {
     const frostGrad = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.25, W * 0.5, H * 0.5, Math.max(W, H) * 0.72);
     frostGrad.addColorStop(0, "rgba(56,189,248,0)");
@@ -993,7 +992,6 @@ function drawBackground() {
   ctx.globalAlpha = 1;
 }
 
-// 辅助路径：经典上尖下圆的葫芦/梨形蜜柚轮廓
 function tracePomeloSilhouette(r) {
   ctx.beginPath();
   ctx.moveTo(0, -r * 1.08);
@@ -1005,7 +1003,6 @@ function tracePomeloSilhouette(r) {
   ctx.closePath();
 }
 
-// ================= 3D 精美立体完整柚子渲染 =================
 function drawPomelo(f) {
   ctx.save();
   ctx.translate(f.x, f.y);
@@ -1024,7 +1021,6 @@ function drawPomelo(f) {
     ctx.fillStyle = body; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 2.5; ctx.stroke();
 
-    // 导火索与火花
     ctx.strokeStyle = "#d97706"; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(0, -r * 0.95); ctx.quadraticCurveTo(10, -r * 1.25, 18, -r * 1.18); ctx.stroke();
     ctx.fillStyle = "#fde047";
@@ -1036,7 +1032,6 @@ function drawPomelo(f) {
     return;
   }
 
-  // 1. 稀有柚子外围能量光环（白柚/蓝柚/连斩皇柚）
   if (f.cfg.glow) {
     const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.08;
     const glow = ctx.createRadialGradient(0, 0, r * 0.65, 0, 0, r * 1.45 * pulse);
@@ -1048,7 +1043,6 @@ function drawPomelo(f) {
     ctx.fill();
   }
 
-  // 2. 底部投影营造悬浮立体感
   ctx.save();
   ctx.translate(6, 10);
   ctx.fillStyle = "rgba(0,0,0,0.34)";
@@ -1056,7 +1050,6 @@ function drawPomelo(f) {
   ctx.fill();
   ctx.restore();
 
-  // 3. 主体 3D 球面光照着色
   ctx.save();
   tracePomeloSilhouette(r);
   ctx.clip();
@@ -1069,7 +1062,6 @@ function drawPomelo(f) {
   ctx.fillStyle = mainGrad;
   ctx.fillRect(-r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
 
-  // 4. 表皮油胞颗粒质感（带受光高光点与暗部微凹点）
   for (let i = 0; i < PORE_SAMPLES.length; i++) {
     const p = PORE_SAMPLES[i];
     const px = p.dx * r;
@@ -1081,13 +1073,11 @@ function drawPomelo(f) {
     ctx.fill();
   }
 
-  // 5. 边缘环境反射光（Rim Light）增强边缘立体轮廓
   ctx.strokeStyle = "rgba(255,255,255,0.28)";
   ctx.lineWidth = 3.5;
   tracePomeloSilhouette(r * 0.98);
   ctx.stroke();
 
-  // 6. 左上方湿润表皮镜面高光
   ctx.save();
   ctx.translate(-r * 0.34, -r * 0.28);
   ctx.rotate(-0.45);
@@ -1101,21 +1091,18 @@ function drawPomelo(f) {
   ctx.fill();
   ctx.restore();
 
-  ctx.restore(); // 结束果身裁剪
+  ctx.restore();
 
-  // 7. 顶部果蒂凹陷与立体绿叶
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath();
   ctx.ellipse(0, -r * 0.96, r * 0.18, r * 0.07, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 果蒂小萼片
   ctx.fillStyle = "#3f6212";
   ctx.beginPath();
   ctx.arc(0, -r * 0.98, r * 0.1, 0, Math.PI * 2);
   ctx.fill();
 
-  // 立体小绿叶
   ctx.save();
   ctx.translate(2, -r * 1.0);
   ctx.rotate(-0.35);
@@ -1131,8 +1118,7 @@ function drawPomelo(f) {
   ctx.fill();
   ctx.restore();
 
-  // 8. 连斩皇柚：专属多段连斩进度环与徽记
-  if (f.kind === "yellowKing") {
+  if (f.kind === "goldenKing") {
     ctx.strokeStyle = "rgba(0,0,0,0.45)";
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -1156,7 +1142,6 @@ function drawPomelo(f) {
   ctx.restore();
 }
 
-// ================= 3D 立体切开柚子瓣渲染 =================
 function drawHalf(h) {
   ctx.save();
   ctx.translate(h.x, h.y);
@@ -1164,13 +1149,11 @@ function drawHalf(h) {
   ctx.globalAlpha = Math.max(0, h.alpha);
 
   const r = h.cfg.r;
-  const dir = h.side; // -1 为上半/左半，1 为下半/右半
-  // 动态透视压缩因子，模拟切开后的柚子瓣在空中 3D 翻转的立体截面
+  const dir = h.side;
   const tilt = 0.48 + 0.28 * Math.sin(h.flip);
   const startA = dir === -1 ? Math.PI : 0;
   const endA = dir === -1 ? Math.PI * 2 : Math.PI;
 
-  // 1. 背面球形外果皮厚度（3D 体积外壳）
   ctx.save();
   ctx.translate(0, dir * r * 0.14 * tilt);
   const shellGrad = ctx.createRadialGradient(-r * 0.25, dir * r * 0.25, r * 0.1, 0, dir * r * 0.2, r * 1.05);
@@ -1184,17 +1167,14 @@ function drawHalf(h) {
   ctx.fill();
   ctx.restore();
 
-  // 2. 3D 透视切面（外果皮圈 -> 海绵白囊 -> 晶莹果肉瓣）
   ctx.save();
   ctx.scale(1, tilt);
 
-  // 切面外果皮边缘环
   ctx.fillStyle = h.cfg.rindMid;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // 海绵状白囊层（带内阴影立体凹陷）
   const pithGrad = ctx.createRadialGradient(0, 0, r * 0.72, 0, 0, r * 0.91);
   pithGrad.addColorStop(0, h.cfg.pith);
   pithGrad.addColorStop(1, "#cbd5e1");
@@ -1203,7 +1183,6 @@ function drawHalf(h) {
   ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
   ctx.fill();
 
-  // 饱满多汁的果肉底盘
   const fleshGrad = ctx.createRadialGradient(-r * 0.15, -r * 0.15, r * 0.05, 0, 0, r * 0.78);
   fleshGrad.addColorStop(0, h.cfg.flesh);
   fleshGrad.addColorStop(0.75, h.cfg.fleshDeep);
@@ -1213,14 +1192,12 @@ function drawHalf(h) {
   ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
   ctx.fill();
 
-  // 8 瓣立体放射状果肉与白色囊衣隔膜
   const segments = 8;
   for (let i = 0; i < segments; i++) {
     const a1 = (i * Math.PI * 2) / segments + 0.06;
     const a2 = ((i + 1) * Math.PI * 2) / segments - 0.06;
     const midA = (a1 + a2) * 0.5;
 
-    // 单个果肉瓣的饱满高光
     ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)";
     ctx.beginPath();
     ctx.moveTo(Math.cos(midA) * r * 0.12, Math.sin(midA) * r * 0.12);
@@ -1228,7 +1205,6 @@ function drawHalf(h) {
     ctx.closePath();
     ctx.fill();
 
-    // 瓣间白色薄膜隔线
     const lineA = (i * Math.PI * 2) / segments;
     ctx.strokeStyle = h.cfg.pith;
     ctx.lineWidth = 2.2;
@@ -1238,13 +1214,11 @@ function drawHalf(h) {
     ctx.stroke();
   }
 
-  // 中心白芯柱
   ctx.fillStyle = h.cfg.pith;
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.13, 0, Math.PI * 2);
   ctx.fill();
 
-  // 切面汁水反光高光带
   ctx.fillStyle = "rgba(255,255,255,0.38)";
   ctx.beginPath();
   ctx.ellipse(-r * 0.22, -r * 0.2, r * 0.34, r * 0.14, -0.4, 0, Math.PI * 2);
@@ -1310,7 +1284,6 @@ function loop(now) {
 
   drawBackground();
 
-  // 1. 背景拟真果汁渍
   stains.forEach(s => {
     s.alpha *= 0.996;
     ctx.save();
@@ -1320,14 +1293,12 @@ function loop(now) {
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
 
-    // 溅射小果渍点
     s.droplets.forEach(d => {
       ctx.beginPath();
       ctx.arc(s.x + d.dx, s.y + d.dy, d.r, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // 湿润汁水光泽边缘
     ctx.fillStyle = s.highlight;
     ctx.globalAlpha = s.alpha * 0.45;
     ctx.beginPath();
@@ -1336,7 +1307,6 @@ function loop(now) {
     ctx.restore();
   });
 
-  // 2. 爆汁水雾冲击波
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const sw = shockwaves[i];
     sw.life -= rawDt;
@@ -1353,7 +1323,6 @@ function loop(now) {
     ctx.restore();
   }
 
-  // 3. 完整 3D 柚子物理更新与绘制
   for (let i = fruits.length - 1; i >= 0; i--) {
     const f = fruits[i];
     f.x += f.vx * dt; f.y += f.vy * dt; f.vy += f.g * dt; f.rot += f.vr * dt;
@@ -1363,7 +1332,7 @@ function loop(now) {
 
     if (f.y > H + f.cfg.r + 55 && f.vy > 0) {
       fruits.splice(i, 1);
-      if (state.running && (state.mode === "arcade" || state.mode === "hardcore") && f.kind !== "bomb" && f.kind !== "yellowKing") {
+      if (state.running && state.mode === "hardcore" && f.kind !== "bomb" && f.kind !== "goldenKing") {
         state.lives--; updateHUD();
         addFloatText(Math.min(W - 60, Math.max(60, f.x)), H - 45, "漏掉柚子 -1❤️", "#fb7185", 18);
         if (state.lives <= 0) endGame();
@@ -1371,7 +1340,6 @@ function loop(now) {
     }
   }
 
-  // 4. 立体切开柚子瓣物理与绘制
   for (let i = halves.length - 1; i >= 0; i--) {
     const h = halves[i];
     h.x += h.vx * dt;
@@ -1383,7 +1351,6 @@ function loop(now) {
     else drawHalf(h);
   }
 
-  // 5. 多层次爆汁液滴与果粒碎片
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
@@ -1407,7 +1374,6 @@ function loop(now) {
       ctx.closePath();
       ctx.fill();
     } else if (p.type === "drop") {
-      // 随速度方向拉伸的立体水滴 + 晶莹反光点
       const speed = Math.hypot(p.vx, p.vy);
       const ang = Math.atan2(p.vy, p.vx);
       const stretch = Math.min(2.8, 1 + speed / 260);
@@ -1434,7 +1400,6 @@ function loop(now) {
     ctx.restore();
   }
 
-  // 6. 刀光拖尾
   const cutoff = now - 150;
   trail = trail.filter(pt => pt.t >= cutoff);
   if (trail.length >= 2) {
@@ -1452,7 +1417,6 @@ function loop(now) {
     }
   }
 
-  // 7. 浮动文字
   for (let i = floatTexts.length - 1; i >= 0; i--) {
     const ft = floatTexts[i];
     ft.y += ft.vy * rawDt; ft.life -= rawDt;
@@ -1466,7 +1430,6 @@ function loop(now) {
     ctx.restore();
   }
 
-  // 8. 屏幕闪光特效
   if (state.flash > 0) {
     ctx.fillStyle = state.flashColor; ctx.globalAlpha = state.flash;
     ctx.fillRect(0, 0, W, H);
